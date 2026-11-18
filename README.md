@@ -1,14 +1,15 @@
 # COW PMR Findings Tracker
 
-Regional managers can use the region filter views on the PMR Issues sheet immediately. Each finding has a unique number in column A. Update Mitigation Plan Date, Action taken/Plan, and Status in columns G–I. Preserve the finding number when sorting or editing.
+The GitHub Pages app uses Supabase Auth and the PMR tables in the existing project. Regional users sign in with an existing email/password account. The database limits reads and updates to regions assigned in `pmr_region_members`. Editors can update the mitigation date, action plan and status.
 
-## Web tracker
+## Regional access
 
-The Apps Script web tracker reads the live PMR Issues tab. It shows finding and unique COW counts for the current filters, and updates columns G–I by finding number. Blank status displays as Open. Web edits require a plan before closure and check for changes made since the finding was loaded.
+An administrator adds one membership row per user and region using the verified Supabase Auth user ID. Nationwide access uses four assignments. The page does not offer public registration or self-assignments.
 
-1. Create a standalone project in Google Apps Script. Copy `Code.gs` into the script file and `Index.html` into an HTML file named `Index`.
-2. In Project Settings → Script Properties, add `PMR_SPREADSHEET_ID`. Use the ID between `/d/` and `/edit` in the source spreadsheet URL.
-3. Choose Deploy → New deployment → Web app. Set **Execute as** to **User accessing the web app** and select the signed-in audience appropriate for your organization.
-4. Test the deployment with a manager who already has Editor access to the spreadsheet. Send the deployment URL to the managers after verification.
+## Findings
 
-Google Sheets permissions govern access. Region filters help managers find their rows. Editors with access to the whole sheet can edit findings in any region. Keep PMR data and spreadsheet IDs out of this public repository.
+The app reads `pmr_findings` from Supabase. Source findings must be approved for import before loading them. Import by stable finding ID and preserve existing mitigation updates if importing again. The GitHub repository contains application code, with no findings or user assignments.
+
+The hexagon shows Gen, DC, HVAC, AC, FACP and SACP for the selected region or all assigned regions. Other and NA entries remain in the register. A finding in multiple dimensions contributes once to the issue total.
+
+The legacy Apps Script files remain available for the spreadsheet workflow.
