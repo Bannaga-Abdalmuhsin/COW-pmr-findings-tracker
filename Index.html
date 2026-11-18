@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{font:15px system-ui,sans-serif;color:#211436;background:#f6f4f9}
+*{box-sizing:border-box} body{margin:0}
+header{background:#341451;color:white;padding:28px max(22px,calc((100% - 1320px)/2))}
+h1,h2,p{margin:0}h1{font-size:clamp(1.5rem,4vw,2.2rem)}
+main{max-width:1360px;margin:auto;padding:22px}
+.metrics,.filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.metric{background:white;border:1px solid #e6deed;border-radius:12px;padding:13px 18px;flex:1;min-width:130px}
+.metric strong{display:block;font-size:1.65rem;margin-top:3px}
+label{display:grid;gap:5px;font-weight:600}input,select,button,textarea{font:inherit;border:1px solid #cbbdd8;border-radius:7px;padding:9px;background:white;color:inherit}
+button{cursor:pointer;font-weight:650}button:disabled{opacity:.55;cursor:wait}
+.primary{background:#582980;color:white;border-color:#582980}.search{flex:1;min-width:215px}
+.table{overflow:auto;background:white;border:1px solid #e6deed;border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #eee8f2;vertical-align:top}
+th{background:#eee6f4}td:nth-child(5){min-width:240px}
+#message,#error{min-height:1.5em;margin:0 0 8px;color:#7e2145}
+.pages,.actions{display:flex;align-items:center;gap:10px;margin-top:12px}
+dialog{border:1px solid #ded1e7;border-radius:14px;width:min(550px,94vw);padding:22px}
+dialog::backdrop{background:#1e102c88}form label{margin:12px 0}textarea{min-height:100px}
+#description{margin:8px 0 12px}small{color:#544465}
+</style>
+</head>
+<body>
+<header><h1>COW PMR Findings Tracker</h1></header>
+<main>
+<div class="metrics" id="metrics"></div>
+<div class="filters">
+<label>Region<select id="region"><option value="">All regions</option></select></label>
+<label>Status<select id="status"><option value="">All statuses</option></select></label>
+<label class="search">Search<input id="query" placeholder="Finding number, COW ID, issue or action"></label>
+<button id="reload" type="button">Refresh</button>
+</div>
+<p id="message" role="status"></p>
+<div class="table"><table>
+<thead><tr><th>#</th><th>Site ID</th><th>Region</th><th>Issue date</th><th>Issue description</th><th>Owner</th><th>Mitigation date</th><th>Action taken / plan</th><th>Status</th><th></th></tr></thead>
+<tbody id="rows"></tbody>
+</table></div>
+<nav class="pages" aria-label="Findings pages"><button id="prev">Previous</button><span id="page"></span><button id="next">Next</button></nav>
+</main>
+<dialog id="editor">
+<form id="update">
+<h2 id="finding"></h2><p id="description"></p>
+<label>Mitigation plan date<input id="date" placeholder="DD-MM-YYYY"></label>
+<label>Action taken / plan<textarea id="plan" maxlength="5000"></textarea></label>
+<label>Status<select id="editStatus" required></select></label>
+<p id="error" role="alert"></p>
+<div class="actions"><button class="primary" id="save">Save changes</button><button type="button" id="cancel">Cancel</button></div>
+</form>
+</dialog>
+<script>
+const el = id => document.getElementById(id);
+const pageSize = 30;
+let records = [], selected, page = 1, loaded = false, saving = false;
+const regionName = value => value.trim().toLowerCase().replace(/^./, c => c.toUpperCase());
+const statusName = value => !value.trim() ? 'Open' : /^in\s*progress$/i.test(value.trim()) ? 'In Progress' : value.trim();
+const addOption = (target, value) => target.add(new Option(value, value));
+const setOptions = (target, options, first) => {
+  const previous = target.value;
+  target.replaceChildren();
+  if (first) target.add(new Option(first, ''));
+  options.forEach(value => addOption(target, value));
+  if ([...target.options].some(option => option.value === previous)) target.value = previous;
+};
+
+function render() {
+  const query = el('query').value.toLowerCase().trim();
+  const result = records.filter(row =>
+    (!el('region').value || regionName(row[2]) === el('region').value) &&
+    (!el('status').value || statusName(row[8]) === el('status').value) &&
+    (!query || row.join(' ').toLowerCase().includes(query))
+  );
+  const totalPages = Math.max(1, Math.ceil(result.length / pageSize));
+  page = Math.min(page, totalPages);
+  el('prev').disabled = page === 1;
+  el('next').disabled = page === totalPages;
+  el('page').textContent = page + ' / ' + totalPages;
+  el('metrics').replaceChildren();
+  const closed = result.filter(row => statusName(row[8]).toLowerCase() === 'closed').length;
+  const unique = new Set(result.map(row => row[1].trim().toUpperCase()).filter(Boolean)).size;
+  for (const [label, number] of [['Findings', result.length], ['Unique COWs', unique], ['Unclosed', result.length - closed], ['Closed', closed]]) {
+    const card = document.createElement('div');
+    card.className = 'metric';
+    const count = document.createElement('strong');
+    count.textContent = loaded ? number : '–';
+    card.append(label, count);
+    el('metrics').append(card);
+  }
+  el('rows').replaceChildren();
+  if (loaded && !result.length) {
+    const cell = el('rows').insertRow().insertCell();
+    cell.colSpan = 10;
+    cell.textContent = 'No findings match these filters.';
+  }
+  for (const record of result.slice((page - 1) * pageSize, page * pageSize)) {
+    const row = el('rows').insertRow();
+    record.forEach((value, i) => {
+      row.insertCell().textContent = i === 8 ? statusName(value) : i === 2 ? regionName(value) : value;
+    });
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.textContent = 'Edit';
+    edit.setAttribute('aria-label', 'Edit finding ' + record[0]);
+    edit.onclick = () => openEditor(record);
+    row.insertCell().append(edit);
+  }
+}
+
+function load() {
+  el('reload').disabled = true;
+  el('message').textContent = 'Loading findings…';
+  google.script.run.withSuccessHandler(data => {
+    records = data.rows;
+    loaded = true;
+    setOptions(el('region'), [...new Set(records.map(row => regionName(row[2])).filter(Boolean))].sort(), 'All regions');
+    setOptions(el('status'), [...new Set([...data.statuses, ...records.map(row => statusName(row[8]))])], 'All statuses');
+    setOptions(el('editStatus'), data.statuses);
+    el('reload').disabled = false;
+    el('message').textContent = '';
+    render();
+  }).withFailureHandler(error => {
+    el('reload').disabled = false;
+    el('message').textContent = error.message;
+  }).listFindings();
+}
+
+function openEditor(record) {
+  selected = record;
+  el('finding').textContent = '#' + record[0] + ' · ' + record[1] + ' · ' + regionName(record[2]);
+  el('description').textContent = record[4];
+  el('date').value = record[6].replace(/^(\d{2})[/.](\d{2})[/.](\d{4})$/, '$1-$2-$3');
+  el('plan').value = record[7];
+  el('editStatus').value = statusName(record[8]);
+  el('error').textContent = '';
+  el('editor').showModal();
+}
+
+el('update').onsubmit = event => {
+  event.preventDefault();
+  if (saving) return;
+  saving = el('save').disabled = el('cancel').disabled = true;
+  el('error').textContent = '';
+  const complete = () => { saving = el('save').disabled = el('cancel').disabled = false; };
+  google.script.run.withSuccessHandler(record => {
+    complete();
+    records = records.map(row => row[0] === record[0] ? record : row);
+    el('editor').close();
+    el('message').textContent = 'Saved finding #' + record[0] + '.';
+    render();
+  }).withFailureHandler(error => {
+    complete();
+    el('error').textContent = error.message;
+  }).updateFinding({id:selected[0], expected:selected, date:el('date').value, plan:el('plan').value, status:el('editStatus').value});
+};
+el('editor').addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+el('cancel').onclick = () => el('editor').close();
+el('reload').onclick = load;
+el('prev').onclick = () => { page--; render(); };
+el('next').onclick = () => { page++; render(); };
+for (const id of ['region', 'status', 'query']) el(id).addEventListener('input', () => { page = 1; render(); });
+render();
+load();
+</script>
+</body>
+</html>
