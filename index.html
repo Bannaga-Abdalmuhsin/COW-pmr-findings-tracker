@@ -5,26 +5,44 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>COW PMR Findings Tracker</title>
 <style>
-:root{font:16px system-ui,sans-serif;color:#261639;background:#f6f3f9}
-body{margin:0}header{background:#35154f;color:white;padding:40px max(24px,calc((100% - 720px)/2))}
-h1{margin:0;font-size:clamp(1.65rem,5vw,2.5rem)}
-main{max-width:720px;margin:28px auto;padding:0 20px}
-section{background:white;border:1px solid #e4d9ec;border-radius:14px;padding:24px}
-h2{margin:0 0 10px;font-size:1.25rem}
-p{margin:0 0 18px;line-height:1.55}
-.action{display:inline-block;padding:11px 15px;background:#552578;color:white;border-radius:8px;font-weight:650;text-decoration:none}
-footer{margin-top:20px}footer a{color:#552578}
+:root{font:15px system-ui,sans-serif;color:#201733;background:#f5f3f8;--purple:#53277d;--line:#e7dfed}*{box-sizing:border-box}body{margin:0}header{background:#2d1648;color:white;padding:20px max(20px,calc((100% - 1490px)/2));display:flex;align-items:center;justify-content:space-between;gap:16px}h1,h2,p{margin:0}h1{font-size:clamp(1.3rem,3vw,1.85rem)}h2{font-size:1.15rem}main{max-width:1530px;margin:auto;padding:20px}.panel,.metric{background:white;border:1px solid var(--line);border-radius:14px;padding:16px}.auth{max-width:440px;margin:40px auto}form label{display:grid;gap:5px;margin:12px 0;font-weight:600}input,select,textarea,button{font:inherit;color:inherit;border:1px solid #cbbcd6;border-radius:8px;padding:9px;background:white}button{cursor:pointer;font-weight:650}button:disabled{opacity:.5}button.primary{background:var(--purple);border-color:var(--purple);color:white}.metrics,.filters,.actions,.account{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.metric{flex:1;min-width:120px}.metric strong{display:block;font-size:1.6rem}.overview{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}.overview .panel{min-width:0}svg{display:block;width:100%;height:340px}svg g[role=button]{cursor:pointer}svg g[role=button]:focus rect{stroke:#53277d;stroke-width:3}.summary{width:100%;border-collapse:collapse;margin-top:10px}.filters{margin:14px 0}.filters label{display:grid;gap:4px;font-weight:600}.search{flex:1;min-width:200px}.table{overflow:auto}.findings{width:100%;min-width:1150px;border-collapse:collapse}.findings td:nth-child(5){min-width:240px;white-space:pre-wrap}.findings td:nth-child(9){min-width:160px;white-space:pre-wrap;overflow-wrap:anywhere}th,td{text-align:left;border-bottom:1px solid var(--line);padding:9px;vertical-align:top}th{background:#f0e9f6}.actions{margin-top:12px}#notice,#formError,#authError{margin:10px 0;color:#83314d;white-space:pre-wrap}dialog{width:min(600px,95vw);border:1px solid var(--line);border-radius:12px;padding:20px}dialog::backdrop{background:#25163b99}textarea{min-height:105px}#editDescription{margin:10px 0;white-space:pre-wrap}small{color:#665777}[hidden]{display:none!important}@media(max-width:760px){.overview{grid-template-columns:1fr}header{align-items:flex-start}main{padding:12px}}
 </style>
 </head>
 <body>
-<header><h1>COW PMR Findings Tracker</h1></header>
+<header><h1>COW PMR Findings Tracker</h1><div class="account" id="account" hidden><span id="email"></span><button id="logout" type="button">Sign out</button></div></header>
 <main>
-<section aria-labelledby="regional">
-<h2 id="regional">Regional findings</h2>
-<p>Open <strong>PMR Monthly Finding Tracker</strong> in Google Drive, then choose your region in the Summary tab. Use your work Google account to edit mitigation dates, actions and status.</p>
-<a class="action" href="https://drive.google.com/drive/u/0/search?q=PMR%20Monthly%20Finding%20Tracker">Find the tracker in Google Drive</a>
+<section id="login" class="panel auth" hidden><h2>Sign in</h2><form id="signIn">
+<label>Work email<input id="loginEmail" type="email" autocomplete="username" required></label>
+<label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+<button class="primary" id="loginButton">Sign in</button><p id="authError" role="alert"></p>
+</form></section>
+<p id="notice" role="status">Connecting to the tracker…</p>
+<section id="dashboard" hidden>
+<div class="metrics" id="metrics"></div>
+<div class="overview">
+<section class="panel"><h2>Findings by equipment dimension</h2><svg id="hex" viewBox="0 0 480 350" aria-label="Six-dimension findings dashboard"></svg><small id="dimensionNote"></small></section>
+<section class="panel"><h2>Regional summary</h2><table class="summary"><thead><tr><th>Region</th><th>Findings</th><th>Unique COWs</th><th>Unclosed</th><th>Closed</th></tr></thead><tbody id="regional"></tbody></table></section>
+</div>
+<section class="panel"><h2>PMR issue register</h2>
+<div class="filters">
+<label>Region<select id="region"></select></label>
+<label>Dimension<select id="dimension"></select></label>
+<label>Status<select id="status"></select></label>
+<label class="search">Search<input id="search" type="search" placeholder="COW ID, finding number, owner or issue"></label>
+<button id="refresh" type="button">Refresh</button>
+</div>
+<div class="table"><table class="findings"><thead><tr><th>#</th><th>COW ID</th><th>Region</th><th>Issue date</th><th>Issue description</th><th>Dimension</th><th>Owner</th><th>Mitigation date</th><th>Action taken / plan</th><th>Status</th><th></th></tr></thead><tbody id="findings"></tbody></table></div>
+<div class="actions"><button id="previous" type="button">Previous</button><span id="pagination"></span><button id="next" type="button">Next</button></div>
 </section>
-<footer><a href="https://github.com/Bannaga-Abdalmuhsin/COW-pmr-findings-tracker#web-tracker">Web tracker deployment instructions</a></footer>
+</section>
+<dialog id="editor"><form id="editForm"><h2 id="editTitle"></h2><p id="editDescription"></p>
+<label>Mitigation plan date<input id="mitigation" type="date"></label>
+<label>Action taken / plan<textarea id="plan" maxlength="10000"></textarea></label>
+<label>Status<select id="editStatus"></select></label><p id="formError" role="alert"></p>
+<div class="actions"><button class="primary" id="save">Save changes</button><button id="cancel" type="button">Cancel</button></div>
+</form></dialog>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js" defer></script>
+<script src="tracker.js" defer></script>
 </body>
 </html>
